@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Lunar Terrain Viewer</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+    #info-box {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 100;
+    }
+    #view-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-family: sans-serif;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 101;
+    }
+    /* Styles for the stats panel */
+    #stats-panel {
+        position: absolute;
+        top: 50px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-family: sans-serif;
+        font-size: 14px;
+        z-index: 100;
+        max-width: 200px;
+        text-align: left; /* Align text within panel */
+    }
+    #stats-panel strong {
+        color: #ffffff;
+        display: block;
+        margin-bottom: 5px;
+    }
+    #stats-panel p { /* Style for paragraphs in stats panel */
+        margin: 0;
+        padding: 2px 0;
+        border-bottom: 1px solid rgba(80,80,80,0.2); /* Subtle separator */
+    }
+    #stats-panel p:last-child {
+        border-bottom: none;
+    }
+    #stats-panel ul { /* Style for lists in stats panel */
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 0.85em; /* Smaller font for list items */
+        color: #b0b0b0; /* Dimmed color */
+        margin-bottom: 5px; /* Space after list */
+    }
+    #stats-panel ul li {
+        margin-bottom: 3px;
+    }
+    #stats-panel ul li span { /* For percentage values */
+        float: right;
+    }
+    /* Style for Horizontal Rule */
+    #stats-panel hr {
+        border: none;
+        border-top: 1px solid rgba(80,80,80,0.4);
+        margin: 10px 0;
+    }
+
+    /* Path Planning Options panel (no change to its styling) */
+    #path-options-panel {
+        position: absolute;
+        top: 250px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-family: sans-serif;
+        font-size: 14px;
+        z-index: 100;
+        max-width: 200px;
+        display: none;
+    }
+    #path-options-panel label {
+        display: block;
+        margin-bottom: 5px;
+        color: #e0e0e0;
+    }
+    #path-options-panel input[type="range"] {
+        width: 100%;
+        margin-top: 5px;
+        -webkit-appearance: none;
+        height: 8px;
+        background: #d3d3d3;
+        outline: none;
+        opacity: 0.7;
+        -webkit-transition: .2s;
+        transition: opacity .2s;
+        border-radius: 4px;
+    }
+    #path-options-panel input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #007bff;
+        cursor: pointer;
+    }
+    #path-options-panel input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #007bff;
+        cursor: pointer;
+    }
+    #path-options-panel input[type="number"] {
+        width: 60px;
+        background: rgba(20, 20, 20, 0.9);
+        color: white;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 3px 5px;
+        margin-left: 5px;
+    }
+    #path-options-panel div {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="view-label">View: Normal</div>
+  <div id="info-box"><em>Hover over terrain to see elevation</em></div>
+  <div id="stats-panel">
+    <strong>Terrain Statistics</strong><br>
+    <p>Min Elevation: <span id="min-elevation">{{ min_elevation }}</span></p>
+    <p>Max Elevation: <span id="max-elevation">{{ max_elevation }}</span></p>
+    <p>Avg Slope: <span id="avg-slope">{{ avg_slope }}</span></p>
+    <p>Danger Area: <span id="danger_area_percent">{{ danger_area_percent }}</span></p>
+
+    <hr> <strong>Top 5 Highest Points (X, Y, Z)</strong>
+    <ul>
+        {% for point in top_points %}
+        <li>{{ point.x|round(0) }}, {{ point.y_elev|round(2) }}, {{ point.z|round(0) }}</li>
+        {% endfor %}
+        {% if top_points|length == 0 %}<li>N/A</li>{% endif %}
+    </ul>
+
+    <hr> <strong>Top 5 Lowest Points (X, Y, Z)</strong>
+    <ul>
+        {% for point in bottom_points %}
+        <li>{{ point.x|round(0) }}, {{ point.y_elev|round(2) }}, {{ point.z|round(0) }}</li>
+        {% endfor %}
+        {% if bottom_points|length == 0 %}<li>N/A</li>{% endif %}
+    </ul>
+
+    <hr> <strong>Slope Distribution</strong>
+    <ul>
+        {% for label, percentage in slope_distribution.items() %}
+        <li>{{ label }}: <span>{{ percentage }}</span></li>
+        {% endfor %}
+        {% if slope_distribution|length == 0 %}<li>N/A</li>{% endif %}
+    </ul>
+  </div>
+
+  <div id="path-options-panel">
+    <strong>Path Planning Options</strong><br>
+    <div>
+        <label for="max-slope-range">Max Slope:</label>
+        <span id="max-slope-value">30°</span>
+    </div>
+    <input type="range" id="max-slope-range" min="0" max="90" value="30" step="1">
+    <div>
+        <label for="max-slope-input">Exact:</label>
+        <input type="number" id="max-slope-input" min="0" max="90" value="30" step="0.1">
+    </div>
+    <button id="recalculate-path-button" style="background:#007bff; color:white; padding:5px 10px; border:none; border-radius:3px; cursor:pointer; width:100%; margin-top:10px;">Recalculate Path</button>
+  </div>
+
+  <canvas id="renderCanvas"></canvas>
+  <select id="download-select" style="position: absolute; top: 10px; right: 10px; z-index: 1000; padding: 4px;">
+  <option disabled selected>Download</option>
+  <option value="/processed/lunar_terrain.obj">Download Mesh (.obj)</option>
+  <option value="/processed/slope_map.png">Download Slope Map (.png)</option>
+  <option value="/processed/hazard_map.png">Download Hazard Map (.png)</option>
+  <option value="/processed/elevation_data.npy">Download Elevation Data (.npy)</option>
+  <option value="screenshot">Download Screenshot (.png)</option>
+</select>
+
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+
+  <script>
+    const PROCESSED_IMAGE_URL = {{ processed_image_url | tojson | default("", true) }};
+    const EXAGGERATION_ENABLED = {{ exaggeration_factor_applied | tojson | default(false, true) }};
+
+    const MIN_ELEVATION = {{ min_elevation | tojson | default("N/A", true) }};
+    const MAX_ELEVATION = {{ max_elevation | tojson | default("N/A", true) }};
+    const AVG_SLOPE = {{ avg_slope | tojson | default("N/A", true) }};
+    const DANGER_AREA_PERCENT = {{ danger_area_percent | tojson | default("N/A", true) }};
+    
+    // NEW: Pass advanced stats to JS
+    const TOP_POINTS = {{ top_points | tojson | default([], true) }};
+    const BOTTOM_POINTS = {{ bottom_points | tojson | default([], true) }};
+    const SLOPE_DISTRIBUTION = {{ slope_distribution | tojson | default({}, true) }};
+
+    const LANDING_ZONES_DATA = {{ landing_zones | tojson | default([], true) }};
+    const IMAGE_WIDTH = {{ image_width | tojson | default(0, true) }};
+    const IMAGE_HEIGHT = {{ image_height | tojson | default(0, true) }};
+  </script>
+
+  <script src="{{ url_for('static', filename='terrain-viewer/src/main.js') }}"></script>
+</body>
+</html>
