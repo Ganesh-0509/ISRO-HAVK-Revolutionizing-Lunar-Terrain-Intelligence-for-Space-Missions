@@ -681,75 +681,63 @@ window.addEventListener("DOMContentLoaded", function () {
   vrButton.style.cursor = "pointer";
   vrButton.style.zIndex = "1000";
   document.body.appendChild(vrButton);
+vrButton.addEventListener("click", async () => {
+    if (!scene.isReady()) {
+        alert("Scene is not ready. Please wait for terrain to load.");
+        return;
+    }
 
-  vrButton.addEventListener("click", async () => {
-      if (!scene.isReady()) {
-          console.warn("Scene not ready for XR yet. Please wait for terrain to load.");
-          return;
-      }
+    if (!navigator.xr) {
+        alert("WebXR is not supported in this browser or device.");
+        return;
+    }
 
-      if (!("xr" in navigator)) {
-          alert("WebXR is not supported in this browser or device.");
-          console.error("WebXR not supported.");
-          return;
-      }
+    const isSupported = await navigator.xr.isSessionSupported("immersive-vr");
+    if (!isSupported) {
+        alert("Immersive VR not supported (check your browser or headset).");
+        return;
+    }
 
-      const isImmersiveVrSupported = await navigator.xr.isSessionSupported("immersive-vr");
-      if (!isImmersiveVrSupported) {
-          alert("Your device or browser does not support immersive VR (no headset found or configured).");
-          console.error("Immersive VR session not supported.");
-          return;
-      }
+    try {
+        if (!xrHelper) {
+            // Make sure terrain and ground are defined
+            const floorMeshes = [];
+            if (typeof ground !== 'undefined') floorMeshes.push(ground);
+            if (typeof terrain !== 'undefined') floorMeshes.push(terrain);
 
-      if (!xrHelper) {
-          try {
-              xrHelper = await scene.createDefaultXRExperienceAsync({
-                floorMeshes: [ground, terrain]
-              });
+            xrHelper = await scene.createDefaultXRExperienceAsync({
+                floorMeshes: floorMeshes
+            });
 
-              xrHelper.pointerSelection.displayLaserPointer = true;
-              xrHelper.pointerSelection.displayGazeInteraction = true;
+            xrHelper.pointerSelection.displayLaserPointer = true;
+            xrHelper.pointerSelection.displayGazeInteraction = true;
 
-              xrHelper.baseExperience.onStateChangedObservable.add((state) => {
-                  if (state === BABYLON.XRState.ENTERING_XR) {
-                      console.log("Entering XR!");
-                      if (terrain) {
-                          const minTerrainY = terrain.getBoundingInfo().boundingBox.minimumWorld.y;
-                          const idealHeight = minTerrainY + 2;
-                          
-                          const xrCamera = scene.activeCamera;
-                          if (xrCamera && xrCamera.position) {
-                              xrCamera.position.x = terrain.position.x;
-                              xrCamera.position.y = idealHeight;
-                              xrCamera.position.z = terrain.position.z;
-                          }
-                      }
-                      camera.detachControl(canvas);
-                  } else if (state === BABYLON.XRState.EXITING_XR) {
-                      console.log("Exiting XR!");
-                      camera.setPosition(new BABYLON.Vector3(0, 100, -150));
-                      camera.setTarget(terrain.position);
-                      camera.attachControl(canvas, true);
-                  }
-              });
-              
-          } catch (error) {
-              console.error("Error creating XR Experience:", error);
-              alert(`Failed to enter VR: ${error.message || "Unknown error"}. Make sure your headset is connected and your browser supports WebXR.`);
-          }
-      } else {
-          if (xrHelper.baseExperience.state === BABYLON.XRState.NOT_IN_XR) {
-              try {
-                await xrHelper.baseExperience.enterXRAsync("immersive-vr", "local-floor");
-              } catch (error) {
-                console.error("Error re-entering XR:", error);
-                alert(`Failed to re-enter VR: ${error.message || "Unknown error"}.`);
-              }
-          } else {
-              console.log("WebXR session already active or in a transient state.");
-          }
-      }
-  });
+            xrHelper.baseExperience.onStateChangedObservable.add((state) => {
+                if (state === BABYLON.XRState.ENTERING_XR) {
+                    console.log("Entering VR mode...");
+                    const xrCam = scene.activeCamera;
+                    if (xrCam && terrain) {
+                        const minY = terrain.getBoundingInfo().boundingBox.minimumWorld.y;
+                        xrCam.position.set(terrain.position.x, minY + 2, terrain.position.z);
+                    }
+                    camera.detachControl(canvas);
+                } else if (state === BABYLON.XRState.EXITING_XR) {
+                    console.log("Exiting VR mode...");
+                    camera.setPosition(new BABYLON.Vector3(0, 100, -150));
+                    camera.setTarget(terrain.position);
+                    camera.attachControl(canvas, true);
+                }
+            });
+        }
+
+        // Explicitly enter XR
+        await xrHelper.baseExperience.enterXRAsync("immersive-vr", "local-floor");
+
+    } catch (error) {
+        console.error("XR Error:", error);
+        alert(`Failed to start VR: ${error.message || "Unknown error"}`);
+    }
+});
 
   engine.runRenderLoop(() => scene.render());
   window.addEventListener("resize", () => engine.resize());
