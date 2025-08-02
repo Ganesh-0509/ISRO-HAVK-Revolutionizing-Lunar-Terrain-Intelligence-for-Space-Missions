@@ -51,7 +51,7 @@ window.addEventListener("DOMContentLoaded", function () {
   };
 
   let terrain, defaultMaterial, slopeMaterial, hazardMaterial;
-  let terrainMinX, terrainMaxX, terrainMinZ, terrainMaxZ;
+  let terrainMinX_world, terrainMaxX_world, terrainMinZ_world, terrainMaxZ_world;
 
   const landingZoneMeshes = [];
 
@@ -100,15 +100,22 @@ window.addEventListener("DOMContentLoaded", function () {
     terrain = meshes[0];
 
     terrain.computeWorldMatrix(true);
-    const finalBounds = terrain.getBoundingInfo().boundingBox;
+    const initialBounds = terrain.getBoundingInfo().boundingBox;
 
-    terrainMinX = finalBounds.minimumWorld.x;
-    terrainMaxX = finalBounds.maximumWorld.x;
-    terrainMinZ = finalBounds.minimumWorld.z;
-    terrainMaxZ = finalBounds.maximumWorld.z;
+    terrain.position.x = -initialBounds.center.x;
+    terrain.position.z = -initialBounds.center.z;
+    terrain.position.y = -initialBounds.minimum.y + 0.05;
 
-    const terrainWidth = terrainMaxX - terrainMinX;
-    const terrainDepth = terrainMaxZ - terrainMinZ;
+    terrain.computeWorldMatrix(true); 
+    const finalRenderedBounds = terrain.getBoundingInfo().boundingBox;
+
+    terrainMinX_world = finalRenderedBounds.minimumWorld.x;
+    terrainMaxX_world = finalRenderedBounds.maximumWorld.x;
+    terrainMinZ_world = finalRenderedBounds.minimumWorld.z;
+    terrainMaxZ_world = finalRenderedBounds.maximumWorld.z;
+
+    const terrainWidth = terrainMaxX_world - terrainMinX_world;
+    const terrainDepth = terrainMaxZ_world - terrainMinZ_world;
 
     if (ground) {
         ground.dispose();
@@ -118,9 +125,9 @@ window.addEventListener("DOMContentLoaded", function () {
       height: terrainDepth * 1.2
     }, scene);
     ground.material = groundMat;
-    ground.position.x = finalBounds.centerWorld.x;
-    ground.position.z = finalBounds.centerWorld.z;
-    ground.position.y = finalBounds.minimumWorld.y - 0.1;
+    ground.position.x = finalRenderedBounds.centerWorld.x;
+    ground.position.z = finalRenderedBounds.centerWorld.z;
+    ground.position.y = finalRenderedBounds.minimumWorld.y - 0.1;
 
 
     defaultMaterial = new BABYLON.StandardMaterial("terrainMat", scene);
@@ -159,25 +166,19 @@ window.addEventListener("DOMContentLoaded", function () {
         LANDING_ZONES_DATA.forEach((zone, index) => {
             const [y_start_px, x_start_px, y_end_px, x_end_px] = zone.bbox;
 
-            const u_start = x_start_px / IMAGE_WIDTH;
-            const u_end = x_end_px / IMAGE_WIDTH;
-            const v_start = y_start_px / IMAGE_HEIGHT;
-            const v_end = y_end_px / IMAGE_HEIGHT;
+            const worldStart = mapPixelToWorld_for_plane(x_start_px, y_start_px);
+            const worldEnd = mapPixelToWorld_for_plane(x_end_px, y_end_px);
+            const worldCenter = mapPixelToWorld_for_plane(zone.center_pixel[1], zone.center_pixel[0]);
 
-            const worldX_start = terrainMinX + u_start * (terrainMaxX - terrainMinX);
-            const worldX_end = terrainMinX + u_end * (terrainMaxX - terrainMinX);
-            const worldZ_start = terrainMinZ + v_start * (terrainMaxZ - terrainMinZ);
-            const worldZ_end = terrainMinZ + v_end * (terrainMaxZ - terrainMinZ); 
+            const zoneWidth = Math.abs(worldEnd.x - worldStart.x);
+            const zoneDepth = Math.abs(worldEnd.z - worldStart.z);
+            const zoneCenterX = worldCenter.x;
+            const zoneCenterZ = worldCenter.z;
 
-            const zoneWidth = Math.abs(worldX_end - worldX_start);
-            const zoneDepth = Math.abs(worldZ_end - worldZ_start);
-            const zoneCenterX = (worldX_start + worldX_end) / 2;
-            const zoneCenterZ = (worldZ_start + worldZ_end) / 2;
-
-            const ray = new BABYLON.Ray(new BABYLON.Vector3(zoneCenterX, finalBounds.maximumWorld.y + 1000, zoneCenterZ), BABYLON.Vector3.Down());
+            const ray = new BABYLON.Ray(new BABYLON.Vector3(zoneCenterX, finalRenderedBounds.maximumWorld.y + 1000, zoneCenterZ), BABYLON.Vector3.Down());
             const pickInfo = scene.pickWithRay(ray, (mesh) => mesh === terrain);
 
-            let zoneElevation = finalBounds.minimumWorld.y;
+            let zoneElevation = finalRenderedBounds.minimumWorld.y;
             if (pickInfo.hit && pickInfo.pickedPoint) {
                 zoneElevation = pickInfo.pickedPoint.y;
             }
@@ -204,6 +205,7 @@ window.addEventListener("DOMContentLoaded", function () {
         console.log("No landing zone data or IMAGE_WIDTH/HEIGHT are zero/invalid. Skipping landing zone visualization.");
     }
   });
+
 
   const viewLabel = document.getElementById("view-label");
 
@@ -238,7 +240,7 @@ window.addEventListener("DOMContentLoaded", function () {
     } else if (e.key === "r") {
       if (terrain) {
           camera.setTarget(terrain.position);
-          camera.radius = Math.max(terrainMaxX - terrainMinX, terrainMaxZ - terrainMinZ) * 0.8;
+          camera.radius = Math.max(terrainWidth, terrainDepth) * 0.8;
       } else {
           camera.setPosition(new BABYLON.Vector3(0, 100, -150));
           camera.setTarget(BABYLON.Vector3.Zero());
@@ -260,8 +262,8 @@ window.addEventListener("DOMContentLoaded", function () {
       const z_display = point.z.toFixed(2);
 
 
-      const pixelX_lookup = Math.floor(((point.x - terrainMinX) / (terrainMaxX - terrainMinX)) * (IMAGE_WIDTH - 1));
-      const pixelY_lookup = Math.floor(((point.z - terrainMinZ) / (terrainMaxZ - terrainMinZ)) * (IMAGE_HEIGHT - 1));
+      const pixelX_lookup = Math.floor(((point.x - terrainMinX_world) / (terrainMaxX_world - terrainMinX_world)) * (IMAGE_WIDTH - 1));
+      const pixelY_lookup = Math.floor(((point.z - terrainMinZ_world) / (terrainMaxZ_world - terrainMinZ_world)) * (IMAGE_HEIGHT - 1));
 
       const clampedPixelX = Math.max(0, Math.min(pixelX_lookup, IMAGE_WIDTH - 1));
       const clampedPixelY = Math.max(0, Math.min(pixelY_lookup, IMAGE_HEIGHT - 1));
@@ -270,8 +272,8 @@ window.addEventListener("DOMContentLoaded", function () {
       if (clampedPixelX >= 0 && clampedPixelX < slopeCanvas.width && clampedPixelY >= 0 && clampedPixelY < slopeCanvas.height) {
         try {
           const pixel = slopeCtx.getImageData(clampedPixelX, clampedPixelY, 1, 1).data[0];
-          const angle = Math.round((pixel / 255) * 90);
-          slopeText = `${angle}°`;
+          const angle = (pixel / 255) * 90; // Now correctly scaled by app.py to represent 0-90
+          slopeText = `${angle.toFixed(2)}°`; 
         } catch (err) {
           console.warn("Slope pixel lookup error:", err);
         }
@@ -471,15 +473,15 @@ window.addEventListener("DOMContentLoaded", function () {
 
           for (let i = 0; i <= numSamples; i++) {
               const interpolatedPoint = BABYLON.Vector3.Lerp(firstPoint, secondPoint, i / numSamples);
-              const pixelX_lookup = Math.floor(((interpolatedPoint.x - terrainMinX) / (terrainMaxX - terrainMinX)) * (IMAGE_WIDTH - 1));
-              const pixelY_lookup = Math.floor(((interpolatedPoint.z - terrainMinZ) / (terrainMaxZ - terrainMinZ)) * (IMAGE_HEIGHT - 1));
+              const pixelX_lookup = Math.floor(((interpolatedPoint.x - terrainMinX_world) / (terrainMaxX_world - terrainMinX_world)) * (IMAGE_WIDTH - 1));
+              const pixelY_lookup = Math.floor(((interpolatedPoint.z - terrainMinZ_world) / (terrainMaxZ_world - terrainMinZ_world)) * (IMAGE_HEIGHT - 1));
               const clampedPixelX = Math.max(0, Math.min(pixelX_lookup, IMAGE_WIDTH - 1));
               const clampedPixelY = Math.max(0, Math.min(pixelY_lookup, IMAGE_HEIGHT - 1));
 
               if (slopeImageLoaded && clampedPixelX >= 0 && clampedPixelX < slopeCanvas.width && clampedPixelY >= 0 && clampedPixelY < slopeCanvas.height) {
                   try {
                       const pixel = slopeCtx.getImageData(clampedPixelX, clampedPixelY, 1, 1).data[0];
-                      const angle = (pixel / 255) * 90;
+                      const angle = (pixel / 255) * 90; // Now correctly scaled by app.py
                       totalSlope += angle;
                       sampleCount++;
                   } catch (err) { /* console.warn */ }
@@ -551,7 +553,7 @@ window.addEventListener("DOMContentLoaded", function () {
               body: JSON.stringify({
                   start_pixel: [startPixel.x, startPixel.y],
                   end_pixel: [endPixel.x, endPixel.y],
-                  max_slope: currentMaxSlope // Use the dynamic max slope value
+                  max_slope: currentMaxSlope
               })
           });
 
@@ -686,7 +688,6 @@ window.addEventListener("DOMContentLoaded", function () {
           return;
       }
 
-      // --- NEW: WebXR API Feature Detection ---
       if (!("xr" in navigator)) {
           alert("WebXR is not supported in this browser or device.");
           console.error("WebXR not supported.");
@@ -699,7 +700,6 @@ window.addEventListener("DOMContentLoaded", function () {
           console.error("Immersive VR session not supported.");
           return;
       }
-      // --- END NEW ---
 
       if (!xrHelper) {
           try {
@@ -755,16 +755,20 @@ window.addEventListener("DOMContentLoaded", function () {
   window.addEventListener("resize", () => engine.resize());
 
   function mapWorldToPixel(worldPoint) {
-      const pixelX = Math.floor(((worldPoint.x - terrainMinX) / (terrainMaxX - terrainMinX)) * (IMAGE_WIDTH - 1));
-      const pixelY = Math.floor(((worldPoint.z - terrainMinZ) / (terrainMaxZ - terrainMinZ)) * (IMAGE_HEIGHT - 1));
+      const pixelX = Math.floor(((worldPoint.x - terrainMinX_world) / (terrainMaxX_world - terrainMinX_world)) * (IMAGE_WIDTH - 1));
+      const pixelY = Math.floor(((worldPoint.z - terrainMinZ_world) / (terrainMaxZ_world - terrainMinZ_world)) * (IMAGE_HEIGHT - 1));
       return { x: pixelX, y: pixelY };
   }
 
-  function mapPixelToWorld(pixelX, pixelY) {
+  function mapPixelToWorld_for_plane(pixelX, pixelY) {
       const u = pixelX / (IMAGE_WIDTH - 1);
       const v = pixelY / (IMAGE_HEIGHT - 1);
-      const worldX = terrainMinX + u * (terrainMaxX - terrainMinX);
-      const worldZ = terrainMinZ + v * (terrainMaxZ - terrainMinZ);
+      const worldX = terrainMinX_world + u * (terrainMaxX_world - terrainMinX_world);
+      const worldZ = terrainMinZ_world + v * (terrainMaxZ_world - terrainMinZ_world);
       return new BABYLON.Vector3(worldX, 0, worldZ);
+  }
+
+  function mapPixelToWorld(pixelX, pixelY) {
+      return mapPixelToWorld_for_plane(pixelX, pixelY);
   }
 });

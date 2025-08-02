@@ -43,43 +43,42 @@
         font-size: 14px;
         z-index: 100;
         max-width: 200px;
-        text-align: left; /* Align text within panel */
+        text-align: left;
     }
     #stats-panel strong {
         color: #ffffff;
         display: block;
         margin-bottom: 5px;
     }
-    #stats-panel p { /* Style for paragraphs in stats panel */
+    #stats-panel p {
         margin: 0;
         padding: 2px 0;
-        border-bottom: 1px solid rgba(80,80,80,0.2); /* Subtle separator */
+        border-bottom: 1px solid rgba(80,80,80,0.2);
     }
     #stats-panel p:last-child {
         border-bottom: none;
     }
-    #stats-panel ul { /* Style for lists in stats panel */
+    #stats-panel ul {
         list-style: none;
         padding: 0;
         margin: 0;
-        font-size: 0.85em; /* Smaller font for list items */
-        color: #b0b0b0; /* Dimmed color */
-        margin-bottom: 5px; /* Space after list */
+        font-size: 0.85em;
+        color: #b0b0b0;
+        margin-bottom: 5px;
     }
     #stats-panel ul li {
         margin-bottom: 3px;
     }
-    #stats-panel ul li span { /* For percentage values */
+    #stats-panel ul li span {
         float: right;
     }
-    /* Style for Horizontal Rule */
     #stats-panel hr {
         border: none;
         border-top: 1px solid rgba(80,80,80,0.4);
         margin: 10px 0;
     }
 
-    /* Path Planning Options panel (no change to its styling) */
+    /* Style for Path Planning Options panel */
     #path-options-panel {
         position: absolute;
         top: 250px;
@@ -154,7 +153,9 @@
     <p>Avg Slope: <span id="avg-slope">{{ avg_slope }}</span></p>
     <p>Danger Area: <span id="danger_area_percent">{{ danger_area_percent }}</span></p>
 
-    <hr> <strong>Top 5 Highest Points (X, Y, Z)</strong>
+    <hr>
+
+    <strong>Top 5 Highest Points (X, Y, Z)</strong>
     <ul>
         {% for point in top_points %}
         <li>{{ point.x|round(0) }}, {{ point.y_elev|round(2) }}, {{ point.z|round(0) }}</li>
@@ -162,7 +163,9 @@
         {% if top_points|length == 0 %}<li>N/A</li>{% endif %}
     </ul>
 
-    <hr> <strong>Top 5 Lowest Points (X, Y, Z)</strong>
+    <hr>
+
+    <strong>Top 5 Lowest Points (X, Y, Z)</strong>
     <ul>
         {% for point in bottom_points %}
         <li>{{ point.x|round(0) }}, {{ point.y_elev|round(2) }}, {{ point.z|round(0) }}</li>
@@ -170,7 +173,9 @@
         {% if bottom_points|length == 0 %}<li>N/A</li>{% endif %}
     </ul>
 
-    <hr> <strong>Slope Distribution</strong>
+    <hr>
+
+    <strong>Slope Distribution</strong>
     <ul>
         {% for label, percentage in slope_distribution.items() %}
         <li>{{ label }}: <span>{{ percentage }}</span></li>
@@ -216,7 +221,6 @@
     const AVG_SLOPE = {{ avg_slope | tojson | default("N/A", true) }};
     const DANGER_AREA_PERCENT = {{ danger_area_percent | tojson | default("N/A", true) }};
     
-    // NEW: Pass advanced stats to JS
     const TOP_POINTS = {{ top_points | tojson | default([], true) }};
     const BOTTOM_POINTS = {{ bottom_points | tojson | default([], true) }};
     const SLOPE_DISTRIBUTION = {{ slope_distribution | tojson | default({}, true) }};

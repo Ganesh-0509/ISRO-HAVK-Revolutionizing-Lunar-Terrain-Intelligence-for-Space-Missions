@@ -12,7 +12,7 @@ from modules.path_planning import find_path
 from PIL import Image
 import shutil
 
-app = Flask(__file__)
+app = Flask(__file__) 
 
 UPLOAD_FOLDER = 'static/uploads'
 PROCESSED_FOLDER = 'static/processed'
@@ -42,7 +42,7 @@ last_image_height = 0
 last_landing_zones_data = []
 
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['GET', 'POST']) 
 def upload():
     global last_processed_image_filename
     global last_original_image_filename
@@ -139,15 +139,13 @@ def upload():
             elevation = np.zeros_like(elevation)
 
         if last_exaggeration_enabled:
-            elevation *= 1500.0
-            print("✅ Vertical Exaggeration: Enabled (factor 1500.0)")
+            elevation *= 200.0 
+            print("✅ Vertical Exaggeration: Enabled (factor 200.0)")
         else:
             elevation *= 50.0
             print("✅ Vertical Exaggeration: Disabled (base scale 50.0)")
 
-        elevation += 10.0
-
-        print("✅ Elevation stats after final scaling and lift:")
+        print("✅ Elevation stats after final scaling:")
         print("   Min elevation:", np.min(elevation))
         print("   Max elevation:", np.max(elevation))
         print("   Mean elevation:", np.mean(elevation))
@@ -163,8 +161,8 @@ def upload():
         print("✅ Raw slope data saved to:", slope_data_path)
 
         slope_image_path = os.path.join(PROCESSED_FOLDER, "slope_map.png")
-        slope_clipped_for_display = np.clip(slope_map, 0, 45) 
-        slope_norm_for_display = np.uint8((slope_clipped_for_display / 45.0) * 255.0) 
+        max_display_angle = 90.0 
+        slope_norm_for_display = np.uint8(np.clip((slope_map / max_display_angle) * 255.0, 0, 255))
         
         colored_slope = cv2.applyColorMap(slope_norm_for_display, cv2.COLORMAP_JET)
         Image.fromarray(slope_norm_for_display).save(slope_image_path)
@@ -253,13 +251,13 @@ def upload():
         slope_bins = [0, 5, 15, 30, 45, 90]
         bin_labels = ["0-5° (Very Low)", "5-15° (Low)", "15-30° (Moderate)", "30-45° (High)", ">45° (Critical)"]
 
-        for i in range(len(bin_labels)): # Correct loop range
+        for i in range(len(bin_labels)): 
             lower_bound = slope_bins[i]
             
-            if i < len(bin_labels) - 1: # For all but the very last bin_label
+            if i < len(bin_labels) - 1:
                 upper_bound = slope_bins[i+1]
                 pixels_in_range = np.sum((slope_map >= lower_bound) & (slope_map < upper_bound))
-            else: # This is the very last bin_label, covering everything >= its lower_bound (45)
+            else:
                 pixels_in_range = np.sum(slope_map >= lower_bound)
             
             percentage = (pixels_in_range / total_pixels_map) * 100 if total_pixels_map > 0 else 0
@@ -332,5 +330,32 @@ def processed_file(filename):
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
+# FIX: Explicitly register the find_rover_path route here
+# This ensures it's part of the URL map even with development server quirks
+# Moved below all other route definitions to ensure app is fully initialized
+@app.route('/find_rover_path', methods=['POST'])
+def find_rover_path_route(): # Renamed the function to avoid clash if you had another 'find_rover_path' below
+    data = request.json
+    start_pixel = tuple(data['start_pixel'])
+    end_pixel = tuple(data['end_pixel'])
+    max_slope = float(data['max_slope'])
+    
+    elevation_path = os.path.join(PROCESSED_FOLDER, "elevation_data.npy")
+    
+    if not os.path.exists(elevation_path):
+        return jsonify({"error": "Elevation data not found. Please process an image first."}), 400
+
+    print(f"Finding path from {start_pixel} to {end_pixel} with max slope {max_slope}°")
+    
+    path_pixels = find_path(elevation_path, start_pixel, end_pixel, max_slope)
+    
+    if path_pixels:
+        print(f"Path found with {len(path_pixels)} steps.")
+        return jsonify({"path": path_pixels}), 200
+    else:
+        print("No path found.")
+        return jsonify({"message": "No path found within given constraints."}), 200
+
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=os.environ.get('PORT', 5000))
+    app.run(debug=True)
