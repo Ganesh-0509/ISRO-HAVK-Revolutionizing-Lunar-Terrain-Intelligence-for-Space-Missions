@@ -356,8 +356,12 @@ def find_rover_path_route(): # Renamed the function to avoid clash if you had an
         print("No path found.")
         return jsonify({"message": "No path found within given constraints."}), 200
 
+@app.route('/')
+def index():
+    return "Hello over HTTPS!"
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=5000, ssl_context=('cert.pem', 'key.pem'), debug=True)
+
+
 

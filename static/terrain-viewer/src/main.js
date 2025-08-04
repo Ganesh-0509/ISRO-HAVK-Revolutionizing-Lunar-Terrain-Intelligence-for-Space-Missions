@@ -1,3 +1,4 @@
+
 window.addEventListener("DOMContentLoaded", function () {
   const canvas = document.getElementById("renderCanvas");
   const engine = new BABYLON.Engine(canvas, true);
@@ -5,7 +6,7 @@ window.addEventListener("DOMContentLoaded", function () {
 
   const METERS_PER_PIXEL = 1.0; 
 
-  scene.clearColor = new BABYLON.Color3(0.7, 0.85, 1.0);
+  scene.clearColor = new BABYLON.Color4(0.7, 0.85, 1.0,1.0);
 
   const camera = new BABYLON.ArcRotateCamera("camera", Math.PI / 2, Math.PI / 2.5, 150, BABYLON.Vector3.Zero(), scene);
   camera.attachControl(canvas, true);
